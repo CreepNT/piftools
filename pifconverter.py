@@ -27,30 +27,35 @@ def main():
         data = f.read()
 
     magic, bitmap_width, bitmap_height, unk1, unk2, texture_type, bitmap_data_length = _pif_header.unpack_from(data, 0)
+
+    if bitmap_data_length > 1:
+        print("Warning ! Unusual bitmap data length detected (size : {bitmap_data_length})".format(**locals()))
+
     image_size = bitmap_width * bitmap_height * bitmap_data_length
 
     offset = _pif_header.size
-    bitmap_palette = [_palette_color(*_palette_data.unpack_from(data, offset + (_palette_data.size * i))) for i in range(256)]
-    pprint(bitmap_palette)
+    entries_in_palette = 2**(8*bitmap_data_length)
+    bitmap_palette = [_palette_color(*_palette_data.unpack_from(data, offset + (_palette_data.size * i))) for i in range(entries_in_palette)]
+    #pprint(bitmap_palette)
 
     print("Magic: {magic}\nWidth: {bitmap_width} | Height: {bitmap_height}\nTexture type: {texture_type}\nBitmap data length: {bitmap_data_length} byte(s)\nSize of the bitmap : {image_size} byte(s)".format(**locals()))
 
-    palette_image = Image.new('RGB',(1,256),None) #Stores the palette in 256px vertical line
-    for i in range(256):
-        color = bitmap_palette[i]
-        palette_image.putpixel((0,i), (color.r, color.g, color.b))
+    if args.save_palette:
+        palette_image = Image.new('RGB',(1,entries_in_palette),None) #Stores the palette in a vertical line
+        for i in range(entires_in_palette):
+            color = bitmap_palette[i]
+            palette_image.putpixel((0,i), (color.r, color.g, color.b))
 
-    if args.show_result:
-        palette_image.show()
-        if args.save_palette:
-            palette_image.save(args.pif_file + "-palette.png","PNG")
-            print("Saved the palette to " + args.pif_file + "-palette.png !", sep="")
+        if args.show_result:
+            palette_image.show()
+        palette_image.save(args.pif_file + "-palette.png","PNG")
+        print("Saved the palette to " + args.pif_file + "-palette.png !", sep="")
             
     
 
-    offset = _pif_header.size + _palette_data.size * 256
+    offset = _pif_header.size + _palette_data.size * entries_in_palette
     pif_image = Image.new('RGB', (bitmap_width,bitmap_height),None)
-
+    
     for i in range(bitmap_width*bitmap_height):
         x = i % bitmap_height #Yes, this is dirty. Sorry.
         y = i // bitmap_height
@@ -62,6 +67,7 @@ def main():
         else:
             color = bitmap_palette[palette_index];
         pif_image.putpixel((x, y), (color.r, color.g, color.b))
+
 
     if args.show_result:
         pif_image.show()
